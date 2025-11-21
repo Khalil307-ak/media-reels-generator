@@ -1,0 +1,27 @@
+# Media Reels Generator - Dependencies
+# Python 3.10+ required
+
+# Core dependencies
+openai>=1.12.0
+whisper>=20231117
+langdetect>=1.0.9
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+
+# Video/Audio processing
+ffmpeg-python>=0.2.0
+
+# Utilities
+tqdm>=4.66.1
+pydantic>=2.5.0
+
+# Optional: For better language detection
+# fasttext>=0.9.2  # Uncomment if using fasttext instead of langdetect
+
+# Optional: For Hugging Face Whisper
+# transformers>=4.35.0
+# torch>=2.1.0
+
+# Optional: For WhisperX
+# whisperx>=3.1.1
+

@@ -1,0 +1,71 @@
+# Media Reels Generator Configuration
+# Copy this file and modify as needed
+
+# API Keys (or use .env file)
+api:
+  openai_api_key: ""  # Leave empty to use OPENAI_API_KEY from environment
+  # Alternative: Use local Whisper by setting use_local_whisper: true
+
+# Transcription settings
+transcription:
+  provider: "openai"  # Options: "openai", "local_whisper", "huggingface", "whisperx"
+  model: "whisper-1"  # For OpenAI: "whisper-1"
+  # For local Whisper: "tiny", "base", "small", "medium", "large"
+  local_model: "base"
+  language: null  # null = auto-detect, or specify: "ar", "en", "fr", etc.
+
+# Highlight extraction
+highlights:
+  default_count: 5  # Number of highlights per file
+  min_duration: 6  # Minimum clip duration in seconds
+  max_duration: 60  # Maximum clip duration in seconds
+  llm_provider: "openai"  # Options: "openai", "anthropic", "local"
+  llm_model: "gpt-4o-mini"  # For OpenAI: "gpt-4o-mini", "gpt-4", "gpt-3.5-turbo"
+  temperature: 0.3  # Lower = more deterministic
+
+# Video processing
+video:
+  # Output formats
+  formats:
+    - name: "square"
+      width: 1080
+      height: 1080
+      aspect_ratio: "1:1"
+    - name: "vertical"
+      width: 1080
+      height: 1920
+      aspect_ratio: "9:16"
+  
+  # Video quality
+  codec: "libx264"
+  preset: "medium"  # ultrafast, superfast, veryfast, faster, fast, medium, slow
+  crf: 23  # Quality: 18-28 (lower = better quality, larger file)
+  fps: 30
+  
+  # Audio
+  audio_codec: "aac"
+  audio_bitrate: "128k"
+  
+  # Subtitle settings
+  burn_subtitles: false  # Set to true to burn subtitles into video
+  subtitle_font_size: 24
+  subtitle_font_color: "white"
+  subtitle_background: "black@0.5"
+
+# Output settings
+output:
+  base_dir: "outputs"
+  create_subtitles: true
+  create_captions: true
+  parallel_processing: false  # Process multiple files in parallel
+
+# Safety and validation
+safety:
+  min_file_duration: 5  # Skip files shorter than this (seconds)
+  require_copyright_confirmation: false  # Set to true to require --confirm-copyright flag
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: "processing.log"
+

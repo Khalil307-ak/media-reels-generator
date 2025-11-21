@@ -90,11 +90,25 @@ class OpenAIWhisperProvider(TranscriptionProvider):
                 }
             
             except Exception as e:
+                error_msg = str(e)
                 if attempt < max_retries - 1:
-                    logger.warning(f"Transcription attempt {attempt + 1} failed: {e}. Retrying...")
+                    logger.warning(f"Transcription attempt {attempt + 1} failed: {error_msg}. Retrying...")
                     time.sleep(retry_delay * (attempt + 1))
                 else:
-                    logger.error(f"Transcription failed after {max_retries} attempts: {e}")
+                    logger.error(f"Transcription failed after {max_retries} attempts: {error_msg}")
+                    # Provide helpful error message for connection issues
+                    if "Connection" in error_msg or "getaddrinfo" in error_msg or "ConnectError" in error_msg:
+                        logger.error("\n" + "="*60)
+                        logger.error("CONNECTION ERROR DETECTED")
+                        logger.error("="*60)
+                        logger.error("Possible solutions:")
+                        logger.error("1. Check your internet connection")
+                        logger.error("2. Check if OpenAI API is accessible from your network")
+                        logger.error("3. Try using local Whisper instead:")
+                        logger.error("   - Change 'provider: local_whisper' in config.yaml")
+                        logger.error("   - Or run: python run.py --input <file> --use-local-whisper")
+                        logger.error("4. Check firewall/proxy settings")
+                        logger.error("="*60 + "\n")
                     raise
         
         raise RuntimeError("Transcription failed after all retries")
@@ -229,7 +243,10 @@ def create_transcription_provider(
     transcription_config = config.get('transcription', {})
     
     if provider == "openai":
-        api_key = config.get('api', {}).get('openai_api_key') or os.getenv('OPENAI_API_KEY')
+        # Try to get API key from config first, then environment
+        api_key = config.get('api', {}).get('openai_api_key', '').strip()
+        if not api_key:
+            api_key = os.getenv('OPENAI_API_KEY', '').strip()
         if not api_key:
             raise ValueError("OpenAI API key not found. Set OPENAI_API_KEY environment variable or in config.yaml")
         model = transcription_config.get('model', 'whisper-1')

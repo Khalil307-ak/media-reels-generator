@@ -36,3 +36,6 @@ temp_*
 # Config with secrets (keep config.yaml.example)
 config.local.yaml
 
+# Warning: If you added API keys to config.yaml, remove them before committing!
+# Use .env file or environment variables instead.
+

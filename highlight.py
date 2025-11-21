@@ -33,7 +33,11 @@ class HighlightExtractor:
         if provider == "openai":
             try:
                 from openai import OpenAI
-                self.client = OpenAI(api_key=api_key or os.getenv('OPENAI_API_KEY'))
+                # Get API key from parameter, environment, or config
+                final_api_key = (api_key or os.getenv('OPENAI_API_KEY', '')).strip()
+                if not final_api_key:
+                    raise ValueError("OpenAI API key not found. Set OPENAI_API_KEY environment variable or pass api_key parameter")
+                self.client = OpenAI(api_key=final_api_key)
             except ImportError:
                 raise ImportError("openai package not installed. Install with: pip install openai")
             except Exception as e:
@@ -82,6 +86,11 @@ class HighlightExtractor:
         
         # Call LLM
         response = self._call_llm(prompt)
+        
+        # If LLM call failed (e.g., quota exceeded), use fallback method
+        if response is None:
+            logger.warning("LLM call failed, using fallback method for highlight extraction")
+            return self._extract_highlights_fallback(segments, num_highlights, min_duration, max_duration)
         
         # Parse response
         highlights = self._parse_response(response, segments)
@@ -186,11 +195,25 @@ IMPORTANT:
                     return response.content[0].text
                 
             except Exception as e:
+                error_msg = str(e)
                 if attempt < max_retries - 1:
-                    logger.warning(f"LLM call attempt {attempt + 1} failed: {e}. Retrying...")
+                    logger.warning(f"LLM call attempt {attempt + 1} failed: {error_msg}. Retrying...")
                     time.sleep(retry_delay * (attempt + 1))
                 else:
-                    logger.error(f"LLM call failed after {max_retries} attempts: {e}")
+                    logger.error(f"LLM call failed after {max_retries} attempts: {error_msg}")
+                    # Check for quota/rate limit errors
+                    if "429" in error_msg or "quota" in error_msg.lower() or "insufficient_quota" in error_msg.lower():
+                        logger.error("\n" + "="*60)
+                        logger.error("OPENAI API QUOTA EXCEEDED")
+                        logger.error("="*60)
+                        logger.error("Your OpenAI API quota has been exceeded.")
+                        logger.error("Solutions:")
+                        logger.error("1. Add credits to your OpenAI account")
+                        logger.error("2. Use a fallback method (simple time-based extraction)")
+                        logger.error("3. Wait for quota reset")
+                        logger.error("="*60 + "\n")
+                        # Don't raise, use fallback instead
+                        return None
                     raise
         
         raise RuntimeError("LLM call failed after all retries")
@@ -287,4 +310,104 @@ IMPORTANT:
         validated.sort(key=lambda x: x['start_time'])
         
         return validated
+    
+    def _extract_highlights_fallback(
+        self,
+        segments: List[Dict[str, Any]],
+        num_highlights: int,
+        min_duration: float,
+        max_duration: float
+    ) -> List[Dict[str, Any]]:
+        """
+        Fallback method to extract highlights without LLM
+        Uses simple time-based segmentation
+        
+        Args:
+            segments: List of transcript segments
+            num_highlights: Number of highlights to extract
+            min_duration: Minimum clip duration
+            max_duration: Maximum clip duration
+        
+        Returns:
+            List of highlight dictionaries
+        """
+        if not segments:
+            return []
+        
+        # Get total duration
+        total_duration = segments[-1]['end'] if segments else 0
+        
+        if total_duration < min_duration:
+            # If file is too short, return single highlight
+            return [{
+                'start_time': segments[0]['start'],
+                'end_time': segments[-1]['end'],
+                'hook': 'Key highlight from the content',
+                'summary': ' '.join([seg['text'] for seg in segments[:3]])[:200],
+                'confidence': 0.5
+            }]
+        
+        # Calculate ideal duration per highlight
+        ideal_duration = min(max_duration, max(min_duration, total_duration / num_highlights))
+        
+        highlights = []
+        current_time = 0
+        
+        for i in range(num_highlights):
+            # Calculate start and end times
+            start_time = current_time
+            end_time = min(start_time + ideal_duration, total_duration)
+            
+            # Adjust to align with segment boundaries
+            start_seg_idx = self._find_segment_index(segments, start_time)
+            end_seg_idx = self._find_segment_index(segments, end_time)
+            
+            if start_seg_idx is None or end_seg_idx is None:
+                break
+            
+            # Get actual times from segments
+            actual_start = segments[start_seg_idx]['start']
+            actual_end = segments[end_seg_idx]['end']
+            
+            # Ensure minimum duration
+            if actual_end - actual_start < min_duration:
+                # Extend to next segments if needed
+                while end_seg_idx < len(segments) - 1 and (segments[end_seg_idx]['end'] - actual_start) < min_duration:
+                    end_seg_idx += 1
+                actual_end = segments[end_seg_idx]['end']
+            
+            # Get text for this highlight
+            highlight_segments = segments[start_seg_idx:end_seg_idx + 1]
+            highlight_text = ' '.join([seg['text'] for seg in highlight_segments])
+            
+            # Create highlight
+            highlight = {
+                'start_time': actual_start,
+                'end_time': min(actual_end, actual_start + max_duration),
+                'hook': highlight_text[:100] + '...' if len(highlight_text) > 100 else highlight_text,
+                'summary': highlight_text[:300] + '...' if len(highlight_text) > 300 else highlight_text,
+                'confidence': 0.6  # Lower confidence for fallback method
+            }
+            
+            highlights.append(highlight)
+            
+            # Move to next position
+            current_time = actual_end
+            
+            # Stop if we've reached the end
+            if actual_end >= total_duration:
+                break
+        
+        return highlights
+    
+    def _find_segment_index(self, segments: List[Dict[str, Any]], time: float) -> Optional[int]:
+        """Find the segment index that contains the given time"""
+        for i, seg in enumerate(segments):
+            if seg['start'] <= time <= seg['end']:
+                return i
+        # If not found, return nearest
+        for i, seg in enumerate(segments):
+            if seg['start'] > time:
+                return max(0, i - 1)
+        return len(segments) - 1 if segments else None
 

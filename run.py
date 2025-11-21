@@ -7,6 +7,7 @@ Processes media files and generates social media reels with highlights
 import argparse
 import sys
 import logging
+import os
 from pathlib import Path
 from typing import List, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -110,10 +111,15 @@ def process_single_file(
         min_duration = highlights_config.get('min_duration', 6.0)
         max_duration = highlights_config.get('max_duration', 60.0)
         
+        # Get API key from config or environment
+        api_key = config.get('api', {}).get('openai_api_key', '').strip()
+        if not api_key:
+            api_key = os.getenv('OPENAI_API_KEY', '').strip()
+        
         extractor = HighlightExtractor(
             provider=highlights_config.get('llm_provider', 'openai'),
             model=highlights_config.get('llm_model', 'gpt-4o-mini'),
-            api_key=config.get('api', {}).get('openai_api_key'),
+            api_key=api_key if api_key else None,
             temperature=highlights_config.get('temperature', 0.3)
         )
         
@@ -269,6 +275,12 @@ Examples:
         help='Process multiple files in parallel'
     )
     
+    parser.add_argument(
+        '--use-local-whisper',
+        action='store_true',
+        help='Use local Whisper instead of OpenAI API (useful if internet connection fails)'
+    )
+    
     args = parser.parse_args()
     
     # Load configuration
@@ -295,6 +307,10 @@ Examples:
     
     if args.parallel:
         config['output']['parallel_processing'] = True
+    
+    if args.use_local_whisper:
+        config['transcription']['provider'] = 'local_whisper'
+        logger.info("Using local Whisper (overridden by --use-local-whisper flag)")
     
     # Get media files
     try:

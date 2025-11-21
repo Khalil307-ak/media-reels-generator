@@ -4,6 +4,7 @@
 # API Keys (or use .env file)
 api:
   openai_api_key: ""  # Leave empty to use OPENAI_API_KEY from environment
+  # IMPORTANT: Never commit API keys to Git! Use .env file or environment variables instead.
   # Alternative: Use local Whisper by setting use_local_whisper: true
 
 # Transcription settings

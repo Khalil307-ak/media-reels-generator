@@ -75,8 +75,15 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
     
     # Override with environment variables if present
     if 'api' in config:
-        if not config['api'].get('openai_api_key'):
-            config['api']['openai_api_key'] = os.getenv('OPENAI_API_KEY', '')
+        api_key_from_config = config['api'].get('openai_api_key', '').strip()
+        if not api_key_from_config:
+            # Try to get from environment if not in config
+            env_key = os.getenv('OPENAI_API_KEY', '').strip()
+            if env_key:
+                config['api']['openai_api_key'] = env_key
+        else:
+            # Use the key from config
+            config['api']['openai_api_key'] = api_key_from_config
     
     return config
 

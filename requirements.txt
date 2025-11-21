@@ -3,7 +3,8 @@
 
 # Core dependencies
 openai>=1.12.0
-whisper>=20231117
+whisper>=1.1.10
+
 langdetect>=1.0.9
 pyyaml>=6.0.1
 python-dotenv>=1.0.0
